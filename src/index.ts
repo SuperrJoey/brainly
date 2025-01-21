@@ -6,6 +6,14 @@ import { userMiddleware } from "./middleware.js";
 import * as bcrypt from "bcrypt-ts";
 import crypto from "crypto";
 
+db.on('error', (error) => {
+    console.error('Database connection error:', error);
+});
+
+db.once('open', () => {
+    console.log("Connected to database");
+})
+
 
 const app = express();
 app.use(express.json());
@@ -103,9 +111,19 @@ app.delete("/api/v1/content", async (req, res) => {
     })
 })
 
-app.post("api/v1/brain/share", userMiddleware, async (req, res) => {
+
+app.post("/api/v1/brain/share", userMiddleware, async (req, res) => {
     try {
         const { contentId } = req.body;
+
+        console.log("Content ID: ", contentId);
+        //@ts-ignore
+        console.log("User ID: ", req.userId);
+
+        if(!contentId) {
+            res.status(400).json({ message: "Content ID is required"});
+            return;
+        }
 
         const content = await models.Content.findOne({
             _id: contentId,
@@ -143,7 +161,8 @@ app.post("api/v1/brain/share", userMiddleware, async (req, res) => {
     }
 });
 
-app.get("api/v1/brain/:shareLink", async (req, res) => {
+
+app.get("/api/v1/brain/:shareLink", async (req, res) => {
     try {
         const { shareLink } = req.params;
 
@@ -191,7 +210,13 @@ app.get("api/v1/brain/:shareLink", async (req, res) => {
     }
 });
 
+
 console.log("Server starting...");
 
+(app._router.stack as any[]).forEach((layer: any) => {
+    if(layer.route) {
+        console.log(`Route: ${layer.route.path} Methods: ${Object.keys(layer.route.methods)}`)
+    }
+})
 
-app.listen(300);
+app.listen(3000);

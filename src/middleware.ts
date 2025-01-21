@@ -20,18 +20,23 @@ export const userMiddleware = (req: Request, res: Response, next: NextFunction) 
         return;
     }
 
-    const decoded = jwt.verify(header as string, JWT_PASSWORD)
-    if(decoded) {
+    const token = header.startsWith("Bearer") 
+            ? header.slice(7)
+            : header;
+
+
+    try {
+        const decoded = jwt.verify(token, JWT_PASSWORD);
+
         //@ts-ignore
         req.userId = decoded.id;
         next();
-    } else {
+    } catch (error) {
         res.status(403).json({
-            message: "not logged in"
-        })
+            message: "Invalid token"
+        });
     }
-
-}
+};
 
 //override the types of the epxress request object
 /*
