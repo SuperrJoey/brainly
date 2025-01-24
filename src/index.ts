@@ -5,6 +5,7 @@ import { JWT_PASSWORD } from "./config.js";
 import { userMiddleware } from "./middleware.js";
 import * as bcrypt from "bcrypt-ts";
 import crypto from "crypto";
+import cors from "cors";
 
 db.on('error', (error) => {
     console.error('Database connection error:', error);
@@ -17,6 +18,7 @@ db.once('open', () => {
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 app.post("/api/v1/signup", async (req, res) => {
     //zod validation, hash pw
