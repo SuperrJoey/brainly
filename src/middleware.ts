@@ -13,13 +13,6 @@ export const userMiddleware = (req: Request, res: Response, next: NextFunction) 
         return;
     }
 
-    if (typeof header !== 'string') {
-        res.status(401).json({
-            message: "Invalid authorization header format"
-        });
-        return;
-    }
-
     const token = header.startsWith("Bearer") 
             ? header.slice(7)
             : header;

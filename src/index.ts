@@ -74,8 +74,10 @@ app.post("/api/v1/signin", async (req, res) => {
 })
 
 app.post("/api/v1/content", userMiddleware, async (req, res) => {
-    const { link, type } = req.body;
+    
+    const { link, type, title } = req.body;
     await models.Content.create({
+        title,
         link,
         type,
         //@ts-ignore
@@ -152,7 +154,7 @@ app.post("/api/v1/brain/share", userMiddleware, async (req, res) => {
 
         res.json({
             message: "Content shared successfully",
-            shareLink: `/brain/${hash}` 
+            shareLink: `/api/v1/brain/${hash}` 
         });
 
     } catch (error) {
@@ -186,16 +188,12 @@ app.get("/api/v1/brain/:shareLink", async (req, res) => {
             {
                 path: "userId",
                 select: "username"
-            },
-            {
-                path: "tags",
-                select: "title"
             }
         ]);
 
         if (!sharedContent) {
             res.status(404).json({
-                mmessage: "Shared content no longer exists"
+                message: "Shared content no longer exists"
             });
             return;
         }
