@@ -6,6 +6,9 @@ import { userMiddleware } from "./middleware.js";
 import * as bcrypt from "bcrypt-ts";
 import crypto from "crypto";
 import cors from "cors";
+import { z } from "zod";
+import cookieParser from "cookie-parser"
+
 
 db.on('error', (error) => {
     console.error('Database connection error:', error);
@@ -17,16 +20,36 @@ db.once('open', () => {
 
 
 const app = express();
+
+app.use(cookieParser());
 app.use(express.json());
-app.use(cors());
+
+const ALLOWED_ORIGIN = process.env.NODE_ENV === "production"
+    ? 'your-production-domain.com'
+    : 'http://localhost:5173';
+
+app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie']
+}));
+
+
+const signupSchema = z.object({
+    username: z.string().min(3, "Username is too short"),
+    password: z.string().min(6, "password is too short")
+
+});
+
 
 app.post("/api/v1/signup", async (req, res) => {
-    //zod validation, hash pw
-    const username = req.body.username;
-    const password = req.body.password;
-
-    try{
+    try {
+        const { username, password } = signupSchema.parse(req.body);
+    
         const hash = await bcrypt.hash(password, 12);
+
         await models.User.create({
             username: username,
             password: hash
@@ -36,7 +59,8 @@ app.post("/api/v1/signup", async (req, res) => {
         res.json({
             message: "User signed up"
         })
-    } catch(e) {
+    }
+     catch(e) {
         res.status(411).json({
             message: "User already exists"
         })
@@ -63,8 +87,19 @@ app.post("/api/v1/signin", async (req, res) => {
             id: user._id.toString()
         }, JWT_PASSWORD);
     
+    res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        maxAge: 24 * 60 * 60 * 1000,
+        path: "/",
+        domain: process.env.NODE_ENV === "production"
+            ? "sampleproductiondomain.com"
+            : "localhost"
+    })
+
         res.json({
-            token
+           message: "Signed in successfully"
         })
     } else {
         res.status(403).json({
@@ -74,21 +109,37 @@ app.post("/api/v1/signin", async (req, res) => {
 })
 
 app.post("/api/v1/content", userMiddleware, async (req, res) => {
-    
+    try {
+
     const { link, type, title } = req.body;
-    await models.Content.create({
-        title,
-        link,
-        type,
-        //@ts-ignore
-        userId: req.userId,
-        tags: []
 
-    })
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
+    const twitterRegex = /^(https?:\/\/)?(www\.)?(twitter\.com\/\w+\/status\/\d+)/;
 
-     res.json({
-        message: "content added"
-    })
+    if ((type === "youtube" && !youtubeRegex.test(link)) ||
+        (type === "twitter" && !twitterRegex.test(link))) {
+            res.status(400).json({ error: "Invalid URL for the selection"})
+            return
+        }
+
+        await models.Content.create({
+            title,
+            link,
+            type,
+            //@ts-ignore
+            userId: req.userId,
+            tags: []
+    
+        })
+    
+         res.json({
+            message: "content added"
+        })
+    } catch (error) {
+        res.status(500).json({
+            error: "Failed to add content"
+        })
+    }
 })
 
 app.get("/api/v1/content", userMiddleware, async(req, res) => {
@@ -210,13 +261,11 @@ app.get("/api/v1/brain/:shareLink", async (req, res) => {
     }
 });
 
+app.post("/api/v1/logout", (req, res) => {
+    res.cookie("token", "", { maxAge: 0 });
+    res.json({ messaage: "Logged out seccessfully" });
+})
 
 console.log("Server starting...");
-
-(app._router.stack as any[]).forEach((layer: any) => {
-    if(layer.route) {
-        console.log(`Route: ${layer.route.path} Methods: ${Object.keys(layer.route.methods)}`)
-    }
-})
 
 app.listen(3000);
